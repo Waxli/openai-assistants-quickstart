@@ -88,7 +88,7 @@ const Chat = ({
 
       setThreadId(storedAssistantId);
     };
-
+ 
     createAssistantIfNeeded();
   }, []);
 

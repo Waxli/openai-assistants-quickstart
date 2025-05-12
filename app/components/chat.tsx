@@ -74,9 +74,9 @@ const Chat = ({
     scrollToBottom();
   }, [messages]);
 
-  // create a new threadID when chat component created
+  // create a new assistant if none exists
   useEffect(() => {
-    const createThread = async () => {
+    const createAssistantIfNeeded = async () => {
       let storedAssistantId = localStorage.getItem('assistantId');
 
       if (!storedAssistantId) {
@@ -89,7 +89,7 @@ const Chat = ({
       setThreadId(storedAssistantId);
     };
 
-    createThread();
+    createAssistantIfNeeded();
   }, []);
 
   const sendMessage = async (text) => {

@@ -77,12 +77,18 @@ const Chat = ({
   // create a new threadID when chat component created
   useEffect(() => {
     const createThread = async () => {
-      const res = await fetch(`/api/assistants/threads`, {
-        method: "POST",
-      });
-      const data = await res.json();
-      setThreadId(data.threadId);
+      let storedAssistantId = localStorage.getItem('assistantId');
+
+      if (!storedAssistantId) {
+        const res = await fetch(`/api/assistants`, { method: "POST" });
+        const data = await res.json();
+        storedAssistantId = data.assistantId;
+        localStorage.setItem('assistantId', storedAssistantId);
+      }
+
+      setThreadId(storedAssistantId);
     };
+
     createThread();
   }, []);
 
@@ -248,6 +254,22 @@ const Chat = ({
     
   }
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, fileType: string) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch('/api/files/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const result = await response.json();
+    console.log(result);
+  };
+
   return (
     <div className={styles.chatContainer}>
       <div className={styles.messages}>
@@ -275,6 +297,16 @@ const Chat = ({
           Send
         </button>
       </form>
+      <div className={styles.uploadButtons}>
+        <label className={styles.uploadButton}>
+          Upload Image
+          <input type="file" accept="image/*" hidden onChange={(e) => handleFileUpload(e, 'image')} />
+        </label>
+        <label className={styles.uploadButton}>
+          Upload PDF
+          <input type="file" accept="application/pdf" hidden onChange={(e) => handleFileUpload(e, 'pdf')} />
+        </label>
+      </div>
     </div>
   );
 };

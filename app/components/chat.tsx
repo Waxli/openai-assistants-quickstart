@@ -76,20 +76,15 @@ const Chat = ({
 
   // create a new assistant if none exists
   useEffect(() => {
-    const createAssistantIfNeeded = async () => {
-      let storedAssistantId = localStorage.getItem('assistantId');
-
-      if (!storedAssistantId) {
-        const res = await fetch(`/api/assistants`, { method: "POST" });
-        const data = await res.json();
-        storedAssistantId = data.assistantId;
-        localStorage.setItem('assistantId', storedAssistantId);
-      }
-
-      setThreadId(storedAssistantId);
+    const createThreadIfNeeded = async () => {
+      // Create a new thread for this session
+      const res = await fetch(`/api/assistants/threads`, { method: "POST" });
+      const data = await res.json();
+      const newThreadId = data.threadId;
+      setThreadId(newThreadId);
     };
  
-    createAssistantIfNeeded();
+    createThreadIfNeeded();
   }, []);
 
   const sendMessage = async (text) => {
@@ -97,6 +92,9 @@ const Chat = ({
       `/api/assistants/threads/${threadId}/messages`,
       {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({
           content: text,
         }),

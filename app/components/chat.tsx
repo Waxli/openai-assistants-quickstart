@@ -98,7 +98,7 @@ const Chat = ({ functionCallHandler = () => Promise.resolve("") }: ChatProps) =>
   useEffect(() => {
     const createThread = async () => {
       try {
-        const res = await fetch(\`/api/assistants/threads\`, { method: "POST" });
+        const res = await fetch(`/api/assistants/threads`, { method: "POST" });
         if (!res.ok) throw new Error("Failed to create thread");
         const data = await res.json();
         setThreadId(data.threadId);
@@ -123,7 +123,7 @@ const Chat = ({ functionCallHandler = () => Promise.resolve("") }: ChatProps) =>
       if (delta.value != null) appendToLastMessage(delta.value);
       if (delta.annotations != null) annotateLastMessage(delta.annotations);
     });
-    stream.on("imageFileDone", (image) => appendToLastMessage(`\\n![${image.file_id}](/api/files/${image.file_id})\\n`));
+    stream.on("imageFileDone", (image) => appendToLastMessage(`\n![${image.file_id}](/api/files/${image.file_id})\n`));
     stream.on("toolCallCreated", (toolCall) => {
       if (toolCall.type === "code_interpreter") appendMessage("code", "");
     });
@@ -154,7 +154,7 @@ const Chat = ({ functionCallHandler = () => Promise.resolve("") }: ChatProps) =>
     } catch (error) {
       console.error("Error sending message:", error);
       setIsSendingMessage(false);
-      setMessages(prev => [...prev, { role: "systemInfo", text: \`Error sending message: ${error.message}\` }]);
+      setMessages(prev => [...prev, { role: "systemInfo", text: `Error sending message: ${(error as Error).message}` }]);
     }
   };
   
@@ -192,7 +192,7 @@ const Chat = ({ functionCallHandler = () => Promise.resolve("") }: ChatProps) =>
     } catch (error) {
       console.error("Error submitting tool action:", error);
       setIsSendingMessage(false);
-      setMessages(prev => [...prev, { role: "systemInfo", text: \`Error processing tool action: ${error.message}\` }]);
+      setMessages(prev => [...prev, { role: "systemInfo", text: `Error processing tool action: ${(error as Error).message}` }]);
     }
   };
 
@@ -219,7 +219,7 @@ const Chat = ({ functionCallHandler = () => Promise.resolve("") }: ChatProps) =>
       let newText = lastMessage.text;
       annotations.forEach((annotation: any) => {
         if (annotation.type === 'file_path' && annotation.file_path) {
-          newText = newText.replaceAll(annotation.text, \`\`); // Remove placeholder, file already linked or handled by assistant
+          newText = newText.replaceAll(annotation.text, ''); // Remove placeholder, file already linked or handled by assistant
         }
       });
       const updatedLastMessage = { ...lastMessage, text: newText };
@@ -247,15 +247,23 @@ const Chat = ({ functionCallHandler = () => Promise.resolve("") }: ChatProps) =>
         throw new Error(result.error || `Failed to upload ${fileType}`);
       }
       
-      setUploadStatus({ type: 'success', message: \`"${result.fileName}" uploaded. ID: ${result.fileId}\` });
-      // Optionally, send a message to the assistant about the uploaded file
-      // const fileInfoMessage = \`User uploaded file: ${result.fileName} (ID: ${result.fileId})\`;
-      // setMessages(prev => [...prev, { role: "user", text: fileInfoMessage }]);
-      // await sendMessageToApi(fileInfoMessage, threadId);
+      const successMessage = `\"${result.fileName}\" uploaded successfully. The assistant has been notified and can now access this file using its ID: ${result.fileId}`;
+      setUploadStatus({ type: 'success', message: successMessage });
+      
+      // Automatically inform the assistant about the uploaded file.
+      const fileInfoMessage = `User uploaded file: ${result.fileName} (ID: ${result.fileId}). You can now reference this file.`;
+      setMessages(prev => [...prev, { role: "user", text: fileInfoMessage }]);
+      if (threadId) { // Ensure threadId is available before sending message
+        await sendMessageToApi(fileInfoMessage, threadId);
+      } else {
+        // Handle case where threadId is not yet set, though unlikely if uploads are enabled after thread creation
+        console.warn("Thread ID not available, cannot send file notification message to assistant immediately.");
+        // Optionally queue this message or show a different user prompt
+      }
 
     } catch (error) {
-      console.error(\`Error uploading ${fileType}:\`, error);
-      setUploadStatus({ type: 'error', message: \`Upload failed: ${error.message}\` });
+      console.error(`Error uploading ${fileType}:`, error);
+      setUploadStatus({ type: 'error', message: `Upload failed: ${(error as Error).message}` });
     } finally {
       setIsUploadingFile(false);
     }

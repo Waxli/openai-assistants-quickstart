@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
     const fileName = file.name;
     
     // Create a Blob from the file and convert it to a File object compatible with OpenAI
+    // This approach works better with TypeScript typing
     const fileBlob = new Blob([buffer], { type: file.type });
     const fileAsFile = new File([fileBlob], fileName, { type: file.type });
     

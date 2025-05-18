@@ -6,11 +6,12 @@ export const runtime = "nodejs";
 // Send a new message to a thread
 export async function POST(request, { params: { threadId } }) {
   try {
-    const { content } = await request.json();
+    const { content, attachments } = await request.json();
     
     await openai.beta.threads.messages.create(threadId, {
       role: "user",
       content: content,
+      attachments: attachments,
     });
 
     const stream = openai.beta.threads.runs.stream(threadId, {

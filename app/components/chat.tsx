@@ -84,6 +84,7 @@ const Chat = ({ functionCallHandler = () => Promise.resolve("") }: ChatProps) =>
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   const [showFileUploadOptions, setShowFileUploadOptions] = useState(false);
+  const [fileIdsForNextMessage, setFileIdsForNextMessage] = useState<string[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRefImage = useRef<HTMLInputElement | null>(null);
@@ -142,12 +143,17 @@ const Chat = ({ functionCallHandler = () => Promise.resolve("") }: ChatProps) =>
     });
   };
 
-  const sendMessageToApi = async (text: string, currentThreadId: string) => {
+  const sendMessageToApi = async (text: string, currentThreadId: string, fileIds?: string[]) => {
     try {
+      const bodyPayload: { content: string; attachments?: any[] } = { content: text };
+      if (fileIds && fileIds.length > 0) {
+        bodyPayload.attachments = fileIds.map(id => ({ file_id: id, tools: [{ type: "file_search" }] }));
+      }
+
       const response = await fetch(`/api/assistants/threads/${currentThreadId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: text }),
+        body: JSON.stringify(bodyPayload),
       });
       if (!response.ok || !response.body) throw new Error("Failed to send message");
       handleStreamResponse(AssistantStream.fromReadableStream(response.body));
@@ -167,7 +173,8 @@ const Chat = ({ functionCallHandler = () => Promise.resolve("") }: ChatProps) =>
     setUserInput("");
     setIsSendingMessage(true);
     setShowFileUploadOptions(false); 
-    await sendMessageToApi(currentMessage, threadId);
+    await sendMessageToApi(currentMessage, threadId, fileIdsForNextMessage);
+    setFileIdsForNextMessage([]);
   };
   
   const handleRequiresAction = async (event: AssistantStreamEvent.ThreadRunRequiresAction) => {
@@ -250,16 +257,10 @@ const Chat = ({ functionCallHandler = () => Promise.resolve("") }: ChatProps) =>
       const successMessage = `\"${result.fileName}\" uploaded successfully. The assistant has been notified and can now access this file using its ID: ${result.fileId}`;
       setUploadStatus({ type: 'success', message: successMessage });
       
-      // Automatically inform the assistant about the uploaded file.
-      const fileInfoMessage = `User uploaded file: ${result.fileName} (ID: ${result.fileId}). You can now reference this file.`;
-      setMessages(prev => [...prev, { role: "user", text: fileInfoMessage }]);
-      if (threadId) { // Ensure threadId is available before sending message
-        await sendMessageToApi(fileInfoMessage, threadId);
-      } else {
-        // Handle case where threadId is not yet set, though unlikely if uploads are enabled after thread creation
-        console.warn("Thread ID not available, cannot send file notification message to assistant immediately.");
-        // Optionally queue this message or show a different user prompt
-      }
+      // Add fileId for the next message instead of sending an auto-message immediately
+      setFileIdsForNextMessage(prev => [...prev, result.fileId]);
+      // Optionally, send a system message to UI that file is ready for next query
+      appendMessage("systemInfo", `File \"${result.fileName}\" ready. It will be attached to your next message for search.`);
 
     } catch (error) {
       console.error(`Error uploading ${fileType}:`, error);
